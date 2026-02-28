@@ -1,0 +1,19 @@
+# User data — keep profiles private
+data/
+
+# PyInstaller
+dist/
+build/
+*.spec
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Editor config
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
