@@ -14,7 +14,7 @@ except Exception:
     _AVAILABLE = False
 
 SAMPLE_RATE = 44100
-MASTER_VOLUME = 0.3  # loud enough to punch through music
+MASTER_VOLUME = 0.82  # loud enough to punch through music
 
 
 # ---------------------------------------------------------------------------
