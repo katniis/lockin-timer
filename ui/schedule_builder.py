@@ -11,16 +11,15 @@ class ScheduleBuilder(ctk.CTkFrame):
         self._default_work = default_work // 60
         self._default_break = default_break // 60
         self._on_start = on_start
-        self._blocks = []   # list of (type_var, duration_var, frame)
+        self._blocks = []
         self._build()
         self._add_block("work")
         self._add_block("break")
         self._add_block("work")
 
     def _build(self):
-        # Header
         header = ctk.CTkFrame(self, fg_color="transparent")
-        header.pack(fill="x", padx=20, pady=(20, 8))
+        header.pack(fill="x", padx=14, pady=(12, 6))
 
         ctk.CTkLabel(header, text="Build your session", font=FONTS["heading"],
                      text_color=COLORS["text"], fg_color="transparent").pack(side="left")
@@ -28,106 +27,79 @@ class ScheduleBuilder(ctk.CTkFrame):
         add_row = ctk.CTkFrame(header, fg_color="transparent")
         add_row.pack(side="right")
 
-        ctk.CTkButton(
-            add_row, text="+ Work", width=80, height=30,
-            fg_color=COLORS["accent_dim"], hover_color=COLORS["accent"],
-            corner_radius=8, font=FONTS["small"],
-            command=lambda: self._add_block("work"),
-        ).pack(side="left", padx=4)
+        ctk.CTkButton(add_row, text="+ Work", width=70, height=26,
+                      fg_color=COLORS["accent_dim"], hover_color=COLORS["accent"],
+                      corner_radius=8, font=FONTS["small"],
+                      command=lambda: self._add_block("work"),
+                      ).pack(side="left", padx=3)
 
-        ctk.CTkButton(
-            add_row, text="+ Break", width=80, height=30,
-            fg_color=COLORS["break_dim"], hover_color=COLORS["break"],
-            text_color=COLORS["text"], corner_radius=8, font=FONTS["small"],
-            command=lambda: self._add_block("break"),
-        ).pack(side="left")
+        ctk.CTkButton(add_row, text="+ Break", width=70, height=26,
+                      fg_color=COLORS["break_dim"], hover_color=COLORS["break"],
+                      text_color=COLORS["text"], corner_radius=8, font=FONTS["small"],
+                      command=lambda: self._add_block("break"),
+                      ).pack(side="left")
 
-        # Divider
-        ctk.CTkFrame(self, fg_color=COLORS["border"], height=1).pack(fill="x", padx=20)
+        ctk.CTkFrame(self, fg_color=COLORS["border"], height=1).pack(fill="x", padx=14)
 
-        # Scrollable block list
+        # Scrollable list — does NOT expand, rows pack to top naturally
         self._list_frame = ctk.CTkScrollableFrame(
-            self, fg_color="transparent", height=220,
+            self, fg_color="transparent",
             scrollbar_button_color=COLORS["border"],
             scrollbar_button_hover_color=COLORS["accent_dim"],
         )
-        self._list_frame.pack(fill="both", expand=True, padx=8, pady=8)
+        self._list_frame.pack(fill="both", expand=True, padx=4, pady=4)
 
-        # Footer summary + start
-        footer = ctk.CTkFrame(self, fg_color=COLORS["surface2"], corner_radius=12)
-        footer.pack(fill="x", padx=20, pady=(0, 20))
+        footer = ctk.CTkFrame(self, fg_color=COLORS["surface2"], corner_radius=10)
+        footer.pack(fill="x", padx=14, pady=(2, 12))
 
         inner = ctk.CTkFrame(footer, fg_color="transparent")
-        inner.pack(fill="x", padx=16, pady=12)
+        inner.pack(fill="x", padx=12, pady=8)
 
-        self._summary_label = ctk.CTkLabel(
-            inner, text="", font=FONTS["small"],
-            text_color=COLORS["text_dim"], fg_color="transparent"
-        )
+        self._summary_label = ctk.CTkLabel(inner, text="", font=FONTS["small"],
+                                            text_color=COLORS["text_dim"], fg_color="transparent")
         self._summary_label.pack(side="left")
 
-        self._start_btn = ctk.CTkButton(
-            inner, text="Start Session →",
-            command=self._start,
-            fg_color=COLORS["accent"], hover_color=COLORS["accent2"],
-            corner_radius=10, height=40, font=FONTS["body_bold"],
-        )
+        self._start_btn = ctk.CTkButton(inner, text="Start Session →",
+                                         command=self._start,
+                                         fg_color=COLORS["accent"], hover_color=COLORS["accent2"],
+                                         corner_radius=8, height=34, font=FONTS["body_bold"])
         self._start_btn.pack(side="right")
-
         self._update_summary()
 
     def _add_block(self, block_type: str):
         default_dur = self._default_work if block_type == "work" else self._default_break
+        color = COLORS["work"] if block_type == "work" else COLORS["break"]
 
-        row = ctk.CTkFrame(self._list_frame, fg_color=COLORS["surface2"], corner_radius=10)
-        row.pack(fill="x", padx=4, pady=4)
+        row = ctk.CTkFrame(self._list_frame, fg_color=COLORS["surface2"], corner_radius=8)
+        row.pack(fill="x", padx=2, pady=2, anchor="n")
 
         inner = ctk.CTkFrame(row, fg_color="transparent")
-        inner.pack(fill="x", padx=12, pady=10)
+        inner.pack(fill="x", padx=10, pady=5)
 
-        # Color bar
-        color = COLORS["work"] if block_type == "work" else COLORS["break"]
-        bar = ctk.CTkFrame(inner, fg_color=color, width=4, corner_radius=2)
-        bar.pack(side="left", fill="y", padx=(0, 12))
+        ctk.CTkFrame(inner, fg_color=color, width=3, corner_radius=2).pack(
+            side="left", fill="y", padx=(0, 8))
 
-        # Type label
         type_var = ctk.StringVar(value=block_type)
-        type_label = ctk.CTkLabel(
-            inner,
-            text="WORK" if block_type == "work" else "BREAK",
-            font=("Helvetica Neue", 10, "bold"),
-            text_color=color,
-            fg_color="transparent",
-            width=45,
-        )
-        type_label.pack(side="left")
+        ctk.CTkLabel(inner, text="WORK" if block_type == "work" else "BREAK",
+                     font=("Helvetica Neue", 10, "bold"), text_color=color,
+                     fg_color="transparent", width=42).pack(side="left")
 
-        # Duration entry
         dur_var = ctk.StringVar(value=str(default_dur))
-        dur_entry = ctk.CTkEntry(
-            inner, textvariable=dur_var,
-            width=60, height=32,
-            fg_color=COLORS["surface"], border_color=COLORS["border"],
-            text_color=COLORS["text"], corner_radius=6,
-        )
-        dur_entry.pack(side="left", padx=8)
+        ctk.CTkEntry(inner, textvariable=dur_var, width=52, height=28,
+                     fg_color=COLORS["surface"], border_color=COLORS["border"],
+                     text_color=COLORS["text"], corner_radius=6).pack(side="left", padx=6)
         dur_var.trace_add("write", lambda *_: self._update_summary())
 
         ctk.CTkLabel(inner, text="min", font=FONTS["small"],
                      text_color=COLORS["text_dim"], fg_color="transparent").pack(side="left")
 
-        # Remove button
-        idx_ref = [None]
-        remove_btn = ctk.CTkButton(
-            inner, text="✕", width=28, height=28,
-            fg_color="transparent", hover_color=COLORS["danger_dim"],
-            text_color=COLORS["text_dim"], corner_radius=6,
-            command=lambda r=row: self._remove_block(r),
-        )
-        remove_btn.pack(side="right")
+        ctk.CTkButton(inner, text="✕", width=24, height=24,
+                      fg_color="transparent", hover_color=COLORS["danger_dim"],
+                      text_color=COLORS["text_dim"], corner_radius=6,
+                      command=lambda r=row: self._remove_block(r),
+                      ).pack(side="right")
 
-        entry = (type_var, dur_var, row, color)
-        self._blocks.append(entry)
+        self._blocks.append((type_var, dur_var, row, color))
         self._update_summary()
 
     def _remove_block(self, frame):
@@ -136,7 +108,7 @@ class ScheduleBuilder(ctk.CTkFrame):
         self._update_summary()
 
     def _update_summary(self):
-        work_mins, break_mins = 0, 0
+        work_mins = break_mins = 0
         for type_var, dur_var, _, _ in self._blocks:
             try:
                 val = int(dur_var.get())
@@ -148,8 +120,7 @@ class ScheduleBuilder(ctk.CTkFrame):
                 break_mins += val
         total = work_mins + break_mins
         self._summary_label.configure(
-            text=f"{len(self._blocks)} blocks · {work_mins}m work · {break_mins}m break · {total}m total"
-        )
+            text=f"{len(self._blocks)} blocks · {work_mins}m work · {break_mins}m break · {total}m total")
 
     def _start(self):
         blocks = []
@@ -161,9 +132,6 @@ class ScheduleBuilder(ctk.CTkFrame):
             except ValueError:
                 continue
             blocks.append(Block(type=type_var.get(), duration=mins * 60))
-
         if not blocks:
             return
-
-        schedule = Schedule(blocks=blocks)
-        self._on_start(schedule)
+        self._on_start(Schedule(blocks=blocks))

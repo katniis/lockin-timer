@@ -10,11 +10,12 @@ AVATAR_COLORS = [
 
 
 class ProfileScreen(ctk.CTkFrame):
-    def __init__(self, parent, storage, on_select_profile, on_general_stats=None):
+    def __init__(self, parent, storage, on_select_profile, on_general_stats=None, on_rewards=None):
         super().__init__(parent, fg_color=COLORS["bg"], corner_radius=0)
         self._storage = storage
         self._on_select = on_select_profile
         self._on_general_stats = on_general_stats
+        self._on_rewards = on_rewards
         self._creating = False
         self._editing = None
         self._build()
@@ -38,7 +39,17 @@ class ProfileScreen(ctk.CTkFrame):
                 text_color=COLORS["text_dim"], border_color=COLORS["border"],
                 border_width=1, corner_radius=10,
                 height=36, font=FONTS["small"],
-            ).pack(side="right")
+            ).pack(side="right", padx=(0, 8))
+
+        if self._on_rewards:
+            ctk.CTkButton(
+                header, text="🏆  Goals & Rewards",
+                command=self._on_rewards,
+                fg_color=COLORS["accent_dim"], hover_color=COLORS["accent"],
+                text_color=COLORS["accent2"], border_color=COLORS["accent"],
+                border_width=1, corner_radius=10,
+                height=36, font=FONTS["small"],
+            ).pack(side="right", padx=(0, 8))
 
         ctk.CTkFrame(self, fg_color=COLORS["border"], height=1).pack(fill="x", padx=40, pady=(16, 0))
 

@@ -48,7 +48,6 @@ class GeneralStatsScreen(ctk.CTkFrame):
         for w in self._scroll.winfo_children():
             w.destroy()
         self._render_combined_overview()
-        self._render_goals_summary()
         self._render_chart()
         self._render_per_profile()
 

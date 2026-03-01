@@ -20,13 +20,13 @@ class MainWindow(ctk.CTk):
         self._mini_window = None
         self._mini_btn = None
 
-        # Session frames — kept alive while switching tabs (never destroyed mid-session)
+        # Session frames — kept alive while switching tabs
         self._timer_frame = None
         self._free_frame = None
-        self._active_tab = None
+        self._active_tab = None      # "timer" | "free" | "stats"
 
-        # Non-session overlays (profiles, mode-select, stats)
-        self._overlay_frame = None
+        # Non-session overlay (profiles, mode-select, stats, rewards)
+        self._overlay = None
 
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
@@ -36,30 +36,41 @@ class MainWindow(ctk.CTk):
         self.minsize(800, 560)
         self.configure(fg_color=COLORS["bg"])
 
+        # Icon
+        try:
+            import os
+            icon_path = os.path.join(os.path.dirname(__file__), "..", "icon", "logo_icon.ico")
+            if os.path.exists(icon_path):
+                self.iconbitmap(icon_path)
+        except Exception:
+            pass
+
         self._content = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
         self._content.pack(fill="both", expand=True)
 
         self._show_profiles()
 
-    # ── Overlay helpers ───────────────────────────────────────────────────────
+    # ── Overlay management ────────────────────────────────────────────────────
 
-    def _show_overlay(self, frame):
-        """Hide all content children, show this frame on top."""
-        if self._overlay_frame:
-            self._overlay_frame.destroy()
-        self._overlay_frame = frame
+    def _set_overlay(self, frame):
+        """Destroy old overlay, hide session frames, show new overlay."""
+        if self._overlay:
+            self._overlay.destroy()
+        self._overlay = frame
+        # Hide all content children then show overlay
         for child in self._content.winfo_children():
             child.pack_forget()
         frame.pack(fill="both", expand=True)
 
-    def _dismiss_overlay(self):
-        """Remove overlay, re-show the active session tab underneath."""
-        if self._overlay_frame:
-            self._overlay_frame.destroy()
-            self._overlay_frame = None
-        self._reveal_active_tab()
+    def _clear_overlay(self):
+        """Remove overlay and reveal whatever session tab is active."""
+        if self._overlay:
+            self._overlay.destroy()
+            self._overlay = None
+        self._show_active_session()
 
-    def _reveal_active_tab(self):
+    def _show_active_session(self):
+        """Pack-show only the active session frame."""
         for child in self._content.winfo_children():
             child.pack_forget()
         if self._active_tab == "timer" and self._timer_frame:
@@ -72,11 +83,12 @@ class MainWindow(ctk.CTk):
     def _show_profiles(self):
         self._hide_nav()
         self._destroy_sessions()
-        self._show_overlay(ProfileScreen(
+        self._set_overlay(ProfileScreen(
             self._content,
             storage=self._storage,
             on_select_profile=self._on_profile_selected,
             on_general_stats=self._show_general_stats,
+            on_rewards=self._show_rewards,
         ))
 
     def _on_profile_selected(self, profile: Profile):
@@ -86,7 +98,7 @@ class MainWindow(ctk.CTk):
     def _show_mode_select(self):
         self._hide_nav()
         self._destroy_sessions()
-        self._show_overlay(ModeSelectScreen(
+        self._set_overlay(ModeSelectScreen(
             self._content,
             profile=self._profile,
             on_scheduled=self._enter_timer,
@@ -97,25 +109,45 @@ class MainWindow(ctk.CTk):
     def _show_general_stats(self):
         self._hide_nav()
         self._destroy_sessions()
-        profiles = []
-        for name in self._storage.list_profiles():
-            try:
-                profiles.append(self._storage.load_profile(name))
-            except Exception:
-                pass
-        self._show_overlay(GeneralStatsScreen(
+        profiles = self._load_all_profiles()
+        self._set_overlay(GeneralStatsScreen(
             self._content,
             profiles=profiles,
             storage=self._storage,
             on_back=self._show_profiles,
         ))
 
-    # ── Session entry ─────────────────────────────────────────────────────────
+    def _show_rewards(self):
+        from ui.rewards_screen import RewardsScreen
+        self._hide_nav()
+        self._destroy_sessions()
+        profiles = self._load_all_profiles()
+        self._set_overlay(RewardsScreen(
+            self._content,
+            profiles=profiles,
+            storage=self._storage,
+            on_back=self._show_profiles,
+        ))
+
+    def _load_all_profiles(self):
+        profiles = []
+        for name in self._storage.list_profiles():
+            try:
+                profiles.append(self._storage.load_profile(name))
+            except Exception:
+                pass
+        return profiles
+
+    # ── Session entry — create frames on demand ───────────────────────────────
 
     def _enter_timer(self):
-        if self._overlay_frame:
-            self._overlay_frame.destroy()
-            self._overlay_frame = None
+        if self._overlay:
+            self._overlay.destroy()
+            self._overlay = None
+        # Destroy free frame — can't run both simultaneously
+        if self._free_frame:
+            self._free_frame.destroy()
+            self._free_frame = None
         if self._timer_frame is None:
             self._timer_frame = TimerScreen(
                 self._content,
@@ -128,9 +160,13 @@ class MainWindow(ctk.CTk):
         self._switch_tab("timer")
 
     def _enter_free(self):
-        if self._overlay_frame:
-            self._overlay_frame.destroy()
-            self._overlay_frame = None
+        if self._overlay:
+            self._overlay.destroy()
+            self._overlay = None
+        # Destroy timer frame — can't run both simultaneously
+        if self._timer_frame:
+            self._timer_frame.destroy()
+            self._timer_frame = None
         if self._free_frame is None:
             self._free_frame = FreeModeScreen(
                 self._content,
@@ -151,26 +187,65 @@ class MainWindow(ctk.CTk):
             self._free_frame = None
         self._active_tab = None
 
-    # ── Tab switching (hide/show, never destroy mid-session) ──────────────────
+    # ── Tab switching ─────────────────────────────────────────────────────────
 
     def _switch_tab(self, tab: str):
+        prev_tab = self._active_tab
         self._active_tab = tab
         self._update_nav_highlight()
 
         if tab == "stats":
-            # Show stats as overlay — session frames stay alive underneath
             stats = StatsScreen(
                 self._content,
                 profile=self._profile,
                 storage=self._storage,
-                on_back=self._dismiss_overlay,
+                on_back=self._on_stats_back,
             )
-            self._show_overlay(stats)
-        else:
-            self._dismiss_overlay()  # clears any stats overlay
-            self._reveal_active_tab()
+            self._set_overlay(stats)
+            return
 
-    # ── Session complete → pulse mini green ───────────────────────────────────
+        # For timer/free tabs: destroy opposite frame, create this one on demand
+        if tab == "timer":
+            if self._free_frame:
+                self._free_frame.destroy()
+                self._free_frame = None
+            if self._timer_frame is None:
+                self._timer_frame = TimerScreen(
+                    self._content,
+                    profile=self._profile,
+                    storage=self._storage,
+                    on_back=self._show_mode_select,
+                    on_complete=self._on_session_complete,
+                )
+        elif tab == "free":
+            if self._timer_frame:
+                self._timer_frame.destroy()
+                self._timer_frame = None
+            if self._free_frame is None:
+                self._free_frame = FreeModeScreen(
+                    self._content,
+                    profile=self._profile,
+                    storage=self._storage,
+                    on_back=self._show_mode_select,
+                    on_complete=self._on_session_complete,
+                )
+
+        self._clear_overlay()
+
+    def _on_stats_back(self):
+        """Return from stats to whichever session tab was active before."""
+        if self._overlay:
+            self._overlay.destroy()
+            self._overlay = None
+        # If active tab is still "stats" (set before going to stats), revert to last session
+        if self._timer_frame:
+            self._active_tab = "timer"
+        elif self._free_frame:
+            self._active_tab = "free"
+        self._update_nav_highlight()
+        self._show_active_session()
+
+    # ── Completion pulse ──────────────────────────────────────────────────────
 
     def _on_session_complete(self):
         if self._mini_window:
@@ -192,8 +267,9 @@ class MainWindow(ctk.CTk):
         left.pack(side="left", fill="y")
 
         self._nav_btns = {}
-        tabs = [("timer", "⏱", "Timer"), ("free", "🆓", "Free Mode"), ("stats", "📊", "My Stats")]
-        for tab_id, icon, label in tabs:
+        for tab_id, icon, label in [("timer", "⏱", "Timer"),
+                                     ("free",  "🆓", "Free Mode"),
+                                     ("stats", "📊", "My Stats")]:
             is_active = tab_id == active
             btn = ctk.CTkButton(
                 left,
@@ -280,11 +356,8 @@ class MainWindow(ctk.CTk):
             return {
                 "time": f._timer.remaining if f._timer else 0,
                 "block_type": f._current_block.type if f._current_block else "work",
-                "on_break": False,
-                "break_elapsed": 0,
-                "paused": f._paused,
-                "running": True,
-                "is_free": False,
+                "on_break": False, "break_elapsed": 0,
+                "paused": f._paused, "running": True, "is_free": False,
                 "inactive_alert": getattr(f, "_inactive_alerted", False),
             }
         if self._free_frame and self._free_frame._running:
@@ -292,15 +365,13 @@ class MainWindow(ctk.CTk):
             return {
                 "time": f._elapsed,
                 "block_type": "break" if f._on_break else "work",
-                "on_break": f._on_break,
-                "break_elapsed": f._break_elapsed,
-                "paused": f._paused,
-                "running": True,
-                "is_free": True,
+                "on_break": f._on_break, "break_elapsed": f._break_elapsed,
+                "paused": f._paused, "running": True, "is_free": True,
                 "inactive_alert": getattr(f, "_inactive_alerted", False),
             }
-        return {"time": 0, "block_type": "ready", "paused": False, "running": False,
-                "is_free": False, "inactive_alert": False, "on_break": False, "break_elapsed": 0}
+        return {"time": 0, "block_type": "ready", "paused": False,
+                "running": False, "is_free": False, "inactive_alert": False,
+                "on_break": False, "break_elapsed": 0}
 
     def _mini_pause(self):
         if self._timer_frame and self._timer_frame._session_running:
