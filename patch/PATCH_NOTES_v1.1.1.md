@@ -85,21 +85,6 @@ Deleting a profile now shows a confirmation dialog before permanently removing i
 - Fixed profile deletion happening immediately without confirmation
 - Fixed icon not displaying — switched to `.ico` + `iconbitmap()` for reliable Windows support
 
----
-
-## How to Build
-
-```bash
-# Install dependencies
-pip install customtkinter pynput numpy sounddevice Pillow pyinstaller
-
-# Build the executable (Windows)
-build.bat
-
-# Or manually
-pyinstaller lockin.spec --clean --noconfirm
-# Output: dist/LockIn-v1.1.1.exe
-```
 
 ---
 

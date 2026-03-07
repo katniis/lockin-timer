@@ -62,17 +62,6 @@ python main.py
 
 Pre-built releases are available on the [Releases](../../releases) page — no Python installation needed.
 
----
-
-## Building the Executable
-
-```bash
-pip install pyinstaller
-cd lockin-timer
-build.bat
-```
-
-Output: `dist/LockIn-vX.X.X.exe`
 
 ---
 
