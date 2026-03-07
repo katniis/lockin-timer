@@ -16,10 +16,10 @@ LEVELS = [
     (12000, "Legend",       "👑"),
 ]
 
-def calc_xp(profiles: list) -> int:
-    """1 XP per 36 seconds of study (= 100 XP/hour)."""
+def calc_xp(profiles: list, bonus_xp: int = 0) -> int:
+    """1 XP per 36 seconds of study (= 100 XP/hour) + bonus XP from completed challenges."""
     total = sum(p.total_work_seconds() + p.total_free_seconds() for p in profiles)
-    return total // 36
+    return (total // 36) + bonus_xp
 
 def get_level(xp: int) -> tuple:
     """Returns (level_name, icon, xp_start, xp_next)."""
@@ -37,13 +37,13 @@ def get_level(xp: int) -> tuple:
 
 # ── Badge definitions ─────────────────────────────────────────────────────────
 
-def get_all_badges(profiles: list) -> list:
+def get_all_badges(profiles: list, bonus_xp: int = 0) -> list:
     """Returns list of (icon, title, description, unlocked: bool)."""
     total_secs = sum(p.total_work_seconds() + p.total_free_seconds() for p in profiles)
     total_sessions = sum(p.total_sessions() for p in profiles)
     total_free = sum(len(p.free_sessions) for p in profiles)
     best_streak = max((p.streak_days() for p in profiles), default=0)
-    xp = calc_xp(profiles)
+    xp = calc_xp(profiles, bonus_xp)
 
     # Night owl: any session started after 22:00
     night_owl = False
@@ -151,7 +151,18 @@ class RewardsScreen(ctk.CTkFrame):
         self._profiles = profiles
         self._storage = storage
         self._on_back = on_back
+        # Auto-claim challenge XP if today's challenge is done
+        self._try_claim_challenge()
+        self._bonus_xp = storage.get_bonus_xp()
         self._build()
+
+    def _try_claim_challenge(self):
+        """Check if today's challenge is complete and claim its XP if not yet claimed."""
+        today_str = date.today().isoformat()
+        if not self._storage.is_challenge_claimed(today_str):
+            _, xp_reward, _, _, done = get_daily_challenge(self._profiles)
+            if done:
+                self._storage.claim_challenge_xp(today_str, xp_reward)
 
     def _build(self):
         nav = ctk.CTkFrame(self, fg_color=COLORS["surface"], corner_radius=0, height=56)
@@ -178,7 +189,7 @@ class RewardsScreen(ctk.CTkFrame):
     # ── Level & XP ────────────────────────────────────────────────────────────
 
     def _render_level(self):
-        xp = calc_xp(self._profiles)
+        xp = calc_xp(self._profiles, self._bonus_xp)
         level_name, level_icon, xp_start, xp_next = get_level(xp)
         progress = (xp - xp_start) / (xp_next - xp_start) if xp_next > xp_start else 1.0
         progress = min(progress, 1.0)
@@ -246,6 +257,8 @@ class RewardsScreen(ctk.CTkFrame):
 
     def _render_daily_challenge(self):
         text, xp_reward, progress, target, done = get_daily_challenge(self._profiles)
+        today_str = date.today().isoformat()
+        claimed = self._storage.is_challenge_claimed(today_str)
         section = self._section("Daily Challenge")
 
         card = ctk.CTkFrame(section, fg_color=COLORS["surface"], corner_radius=16,
@@ -255,23 +268,27 @@ class RewardsScreen(ctk.CTkFrame):
         inner = ctk.CTkFrame(card, fg_color="transparent")
         inner.pack(fill="x", padx=20, pady=16)
 
-        # Header row
         header = ctk.CTkFrame(inner, fg_color="transparent")
         header.pack(fill="x")
 
-        ctk.CTkLabel(header, text="✓ " + text if done else text,
+        ctk.CTkLabel(header, text=("✓ " + text) if done else text,
                      font=FONTS["heading"],
                      text_color=COLORS["success"] if done else COLORS["text"],
                      fg_color="transparent").pack(side="left")
 
-        xp_badge = ctk.CTkFrame(header, fg_color=COLORS["accent_dim"], corner_radius=8)
+        xp_badge = ctk.CTkFrame(header,
+                                 fg_color=COLORS["success"] if claimed else COLORS["accent_dim"],
+                                 corner_radius=8)
         xp_badge.pack(side="right")
-        ctk.CTkLabel(xp_badge, text=f"+{xp_reward} XP",
+        badge_text = f"✓ +{xp_reward} XP claimed" if claimed else f"+{xp_reward} XP"
+        ctk.CTkLabel(xp_badge, text=badge_text,
                      font=("Helvetica Neue", 11, "bold"),
-                     text_color=COLORS["accent2"], fg_color="transparent").pack(padx=12, pady=4)
+                     text_color="white" if claimed else COLORS["accent2"],
+                     fg_color="transparent").pack(padx=12, pady=4)
 
-        ctk.CTkLabel(inner, text="Resets at midnight  •  Bonus XP on completion",
-                     font=FONTS["small"], text_color=COLORS["text_dim"],
+        sub = "Bonus XP awarded! ✨" if claimed else "Resets at midnight  •  Bonus XP on completion"
+        ctk.CTkLabel(inner, text=sub, font=FONTS["small"],
+                     text_color=COLORS["success"] if claimed else COLORS["text_dim"],
                      fg_color="transparent").pack(anchor="w", pady=(4, 10))
 
         # Progress bar
@@ -393,7 +410,7 @@ class RewardsScreen(ctk.CTkFrame):
     def _render_badges(self):
         section = self._section("Badges")
 
-        badges = get_all_badges(self._profiles)
+        badges = get_all_badges(self._profiles, self._bonus_xp)
         unlocked = [b for b in badges if b[3]]
         locked = [b for b in badges if not b[3]]
 

@@ -258,8 +258,13 @@ class MiniWindow(ctk.CTkToplevel):
             self._pulse_count += 1
 
         if self._pulse_count >= 3:
-            # Done pulsing — close after a short delay
-            self.after(800, self._finish_complete)
+            # Pulses done — hold the green "DONE" state for 5 seconds then close
+            try:
+                self._outer.configure(border_color=COLORS["success"])
+                self._clock.configure(text_color=COLORS["success"])
+            except Exception:
+                pass
+            self.after(5000, self._finish_complete)
         else:
             self._pulse_job = self.after(500, self._pulse_green)
 

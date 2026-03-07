@@ -48,3 +48,39 @@ class StorageService:
     def append_session(self, profile: Profile, session_dict: dict):
         profile.sessions.append(session_dict)
         self.save_profile(profile)
+
+    # ── App-level data (challenge XP, etc.) ──────────────────────────────────
+
+    def _app_data_path(self) -> str:
+        return os.path.join(self.data_dir, "_app_data.json")
+
+    def _load_app_data(self) -> dict:
+        path = self._app_data_path()
+        if not os.path.exists(path):
+            return {}
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def _save_app_data(self, data: dict):
+        with open(self._app_data_path(), "w") as f:
+            json.dump(data, f, indent=2)
+
+    def get_bonus_xp(self) -> int:
+        """Total bonus XP earned from completed daily challenges."""
+        return self._load_app_data().get("bonus_xp", 0)
+
+    def claim_challenge_xp(self, date_str: str, xp: int):
+        """Award bonus XP for a challenge date — idempotent, won't double-award."""
+        data = self._load_app_data()
+        claimed = data.get("claimed_challenges", [])
+        if date_str not in claimed:
+            claimed.append(date_str)
+            data["claimed_challenges"] = claimed
+            data["bonus_xp"] = data.get("bonus_xp", 0) + xp
+            self._save_app_data(data)
+
+    def is_challenge_claimed(self, date_str: str) -> bool:
+        return date_str in self._load_app_data().get("claimed_challenges", [])
